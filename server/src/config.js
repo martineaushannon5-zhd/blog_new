@@ -24,7 +24,9 @@ async function connectDatabase() {
   }
 
   try {
+    console.log('before mongoose.connect');
     await mongoose.connect(config.mongodbUri);
+    console.log('after mongoose.connect');
     databaseMode = 'mongo';
     console.log('[db] MongoDB connected successfully.');
     return { connected: true, mode: databaseMode };
