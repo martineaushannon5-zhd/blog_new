@@ -1,5 +1,26 @@
 <template>
-  <div class="space-y-24">
+  <Teleport to="body">
+    <div
+      v-if="showIntroVideo"
+      class="fixed inset-0 z-[100] overflow-hidden bg-black transition-opacity duration-700"
+      :class="introVideoFading ? 'opacity-0 pointer-events-none' : 'opacity-100'"
+    >
+      <video
+        ref="heroVideoRef"
+        class="h-full w-full object-cover"
+        :src="homeHeroVideo"
+        autoplay
+        muted
+        playsinline
+        preload="auto"
+        @ended="handleHeroVideoEnded"
+      ></video>
+      <div class="absolute inset-0 bg-black/18"></div>
+    </div>
+  </Teleport>
+
+  <div class="relative space-y-24">
+    <div class="relative z-10 space-y-24">
     <section class="min-h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex-1 flex flex-col justify-center items-start relative pb-10 md:pb-12">
         <button
@@ -164,6 +185,7 @@
         </router-link>
       </div>
     </section>
+    </div>
   </div>
 </template>
 
@@ -173,6 +195,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { getPosts } from '../api/content'
+import homeHeroVideo from '../assets/home/home1.mp4'
 import scrollDownArrow from '../assets/home/scroll-down-arrow.png'
 import type { Post } from '../types/content'
 import { formatDate } from '../utils/format'
@@ -185,7 +208,12 @@ const loading = ref(true)
 const error = ref('')
 const nextSectionRef = ref<HTMLElement | null>(null)
 const showScrollDivider = ref(false)
+const heroVideoRef = ref<HTMLVideoElement | null>(null)
+const showIntroVideo = ref(true)
+const introVideoFading = ref(false)
 let scrollDividerTimer: number | undefined
+let introVideoHideTimer: number | undefined
+let previousBodyOverflow = ''
 
 const meta = computed(() => {
   const categories = new Set(
@@ -216,6 +244,14 @@ function scrollToNextSection() {
   window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' })
 }
 
+function handleHeroVideoEnded() {
+  introVideoFading.value = true
+  document.body.style.overflow = previousBodyOverflow
+  introVideoHideTimer = window.setTimeout(() => {
+    showIntroVideo.value = false
+  }, 700)
+}
+
 async function loadPosts() {
   loading.value = true
   error.value = ''
@@ -232,6 +268,8 @@ async function loadPosts() {
 }
 
 onMounted(() => {
+  previousBodyOverflow = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
   loadPosts()
   scrollDividerTimer = window.setTimeout(() => {
     showScrollDivider.value = true
@@ -242,5 +280,11 @@ onBeforeUnmount(() => {
   if (scrollDividerTimer) {
     window.clearTimeout(scrollDividerTimer)
   }
+
+  if (introVideoHideTimer) {
+    window.clearTimeout(introVideoHideTimer)
+  }
+
+  document.body.style.overflow = previousBodyOverflow
 })
 </script>

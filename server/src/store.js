@@ -37,6 +37,118 @@ const Experience =
 
 const memoryPosts = [
   {
+    _id: '6860b4f00000000000000003',
+    title: {
+      zh: 'zhdstudy.cloud：我的全栈项目从搭建到上线',
+      en: 'zhdstudy.cloud: From Full-Stack Build To Production Launch'
+    },
+    content: {
+      zh: `# zhdstudy.cloud：我的全栈项目从搭建到上线
+
+这篇日志记录了我把 \`zhdstudy.cloud\` 从一个想法逐步落地为真实线上项目的过程。
+
+## 项目背景
+
+我希望做的不只是一个静态展示页，而是一个真正可以持续迭代的全栈项目。它既要有前台页面来展示内容，也要有后台能力来管理文章和项目经历，并且能够独立部署上线，形成完整闭环。
+
+## 技术选型
+
+这个项目采用了前后端分离的方式进行搭建：
+
+- 前端：Vue 3、Vite、TypeScript、Vue Router、Pinia、Tailwind CSS
+- 后端：Node.js、Express
+- 数据层：MongoDB 兼容设计，同时保留本地内存模式，方便开发和演示
+- 鉴权：JWT 管理后台登录状态
+- 部署域名：\`zhdstudy.cloud\`
+
+## 我做了什么
+
+在这个项目里，我完整参与并实现了以下核心部分：
+
+1. 设计并搭建了前端页面结构，包括首页、文章列表、文章详情、关于页和合作页。
+2. 编写了 Node.js + Express 后端接口，用于文章与项目经历的读取、创建、编辑和删除。
+3. 为后台管理系统实现了登录鉴权、文章管理和经历管理功能。
+4. 设计了前后端通信的数据结构，支持中英文双语内容。
+5. 处理了本地开发、接口联调、跨域配置以及部署上线后的访问问题。
+6. 将项目发布到线上域名，使它从开发环境真正进入可访问、可展示、可维护的正式阶段。
+
+## 上线后的意义
+
+\`zhdstudy.cloud\` 的上线，对我来说不仅是把一个网站放到公网，更重要的是验证了我具备把一个全栈项目独立做完的能力。
+
+从界面设计、功能开发、接口联调，到后台鉴权、内容管理和最终部署，这个过程让我对“完整项目交付”有了更清晰的理解。它也是我后续继续扩展功能、沉淀作品和展示技术能力的重要基础。
+
+## 下一步计划
+
+接下来，我会继续围绕这个项目迭代，包括：
+
+- 优化后台内容编辑体验
+- 增加更完善的文章分类与标签管理
+- 持续补充项目日志与开发记录
+- 进一步提升线上版本的稳定性与展示效果
+
+如果说以前我是在学习单点技术，那么 \`zhdstudy.cloud\` 更像是我把这些技术真正串起来、做成一个完整作品的开始。`,
+      en: `# zhdstudy.cloud: From Full-Stack Build To Production Launch
+
+This post documents how I turned \`zhdstudy.cloud\` from an idea into a real production-ready full-stack project.
+
+## Background
+
+I did not want to build only a static showcase page. I wanted a real full-stack product that could keep evolving over time, with a public-facing website, an admin system for content management, and a complete deployment workflow.
+
+## Tech Stack
+
+The project is built with a separated front-end and back-end architecture:
+
+- Frontend: Vue 3, Vite, TypeScript, Vue Router, Pinia, Tailwind CSS
+- Backend: Node.js, Express
+- Data layer: MongoDB-compatible design with an in-memory fallback for development and demos
+- Authentication: JWT for admin access
+- Production domain: \`zhdstudy.cloud\`
+
+## What I Built
+
+In this project, I implemented the following key parts:
+
+1. Built the front-end pages, including the home page, posts list, post detail page, about page, and cooperation page.
+2. Developed Node.js + Express APIs for reading, creating, editing, and deleting posts and project experiences.
+3. Implemented the admin system with login authentication, post management, and experience management.
+4. Designed the data structures between the front end and back end, including bilingual content support.
+5. Solved local development issues, API integration, CORS configuration, and deployment-related access problems.
+6. Deployed the project to a live domain so it became a real online product instead of a local demo.
+
+## Why It Matters
+
+Launching \`zhdstudy.cloud\` means more to me than simply putting a website online. It proves that I can independently deliver a complete full-stack project.
+
+From interface design and feature development to API integration, admin authentication, content management, and production deployment, this project gave me a much clearer understanding of end-to-end product delivery.
+
+## Next Steps
+
+I plan to continue improving this project by:
+
+- Enhancing the admin editing experience
+- Adding more complete category and tag management
+- Publishing more development logs and project updates
+- Further improving the reliability and presentation quality of the live site
+
+If I used to learn technologies separately, \`zhdstudy.cloud\` is where I started turning them into one complete product.`
+    },
+    summary: {
+      zh: '记录 zhdstudy.cloud 从前后端搭建、后台实现到正式上线的完整过程，以及这个全栈项目对我的意义。',
+      en: 'A full recap of building, managing, and launching zhdstudy.cloud as a real full-stack project.'
+    },
+    category: {
+      zh: '全栈项目',
+      en: 'Full Stack'
+    },
+    tags: ['zhdstudy.cloud', 'vue', 'vite', 'typescript', 'nodejs', 'express', 'jwt'],
+    coverImage: '',
+    isPublished: true,
+    createdAt: new Date('2026-07-03T09:30:00.000Z'),
+    updatedAt: new Date('2026-07-03T09:30:00.000Z')
+  },
+  {
     _id: '682b4a710000000000000001',
     title: {
       zh: '欢迎来到我的动态博客',
