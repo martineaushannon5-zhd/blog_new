@@ -1,25 +1,24 @@
 <template>
-  <Teleport to="body">
-    <div
-      v-if="showIntroVideo"
-      class="fixed inset-0 z-[100] overflow-hidden bg-black transition-opacity duration-700"
-      :class="introVideoFading ? 'opacity-0 pointer-events-none' : 'opacity-100'"
-    >
-      <video
-        ref="heroVideoRef"
-        class="h-full w-full object-cover"
-        :src="homeHeroVideo"
-        autoplay
-        muted
-        playsinline
-        preload="auto"
-        @ended="handleHeroVideoEnded"
-      ></video>
-      <div class="absolute inset-0 bg-black/18"></div>
-    </div>
-  </Teleport>
-
-  <div class="relative space-y-24">
+  <div class="relative">
+    <Teleport to="body">
+      <div
+        v-if="showIntroVideo"
+        class="fixed inset-0 z-[100] overflow-hidden bg-black transition-opacity duration-700"
+        :class="introVideoFading ? 'opacity-0 pointer-events-none' : 'opacity-100'"
+      >
+        <video
+          ref="heroVideoRef"
+          class="h-full w-full object-cover"
+          :src="homeHeroVideo"
+          autoplay
+          muted
+          playsinline
+          preload="auto"
+          @ended="handleHeroVideoEnded"
+        ></video>
+        <div class="absolute inset-0 bg-black/18"></div>
+      </div>
+    </Teleport>
     <div class="relative z-10 space-y-24">
     <section class="min-h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex-1 flex flex-col justify-center items-start relative pb-10 md:pb-12">
