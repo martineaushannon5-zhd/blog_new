@@ -26,6 +26,33 @@
         </div>
       </header>
 
+      <section v-if="post.demoVideo" class="space-y-4">
+        <div class="flex items-center gap-2 text-sm text-gray-400">
+          <MonitorPlay class="w-4 h-4 text-primary" />
+          <span>{{ locale === 'en' ? 'Live demo · browsing & hands-on walkthrough' : '项目演示 · 浏览与试用实录' }}</span>
+        </div>
+        <div class="glass-panel overflow-hidden rounded-2xl border border-white/10">
+          <video
+            class="w-full aspect-video object-cover bg-black"
+            :src="post.demoVideo"
+            :poster="post.demoPoster || undefined"
+            controls
+            playsinline
+            preload="metadata"
+          ></video>
+        </div>
+        <a
+          v-if="post.projectUrl"
+          :href="post.projectUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-2 px-6 py-3 bg-primary hover:bg-emerald-400 text-darker rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(52,211,153,0.35)] hover:-translate-y-0.5"
+        >
+          <ExternalLink class="w-4 h-4" />
+          {{ locale === 'en' ? 'Visit project' : '访问项目' }}
+        </a>
+      </section>
+
       <div class="prose prose-invert prose-emerald max-w-none">
         <div v-html="parsedContent"></div>
       </div>
@@ -36,7 +63,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowLeft } from 'lucide-vue-next'
+import { ArrowLeft, ExternalLink, MonitorPlay } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { getPostById } from '../api/content'
 import type { Post } from '../types/content'

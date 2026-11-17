@@ -13,6 +13,9 @@ export interface Post {
   category: LocalizedValue
   tags: string[]
   coverImage: string
+  demoVideo?: string
+  demoPoster?: string
+  projectUrl?: string
   isPublished: boolean
   createdAt: string
   updatedAt: string

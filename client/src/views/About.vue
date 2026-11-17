@@ -1,5 +1,6 @@
 <template>
   <div class="space-y-24 max-w-5xl mx-auto py-10">
+    <BackgroundCodeflow />
     <!-- Header -->
     <header class="text-center space-y-8">
       <div class="relative w-40 h-40 mx-auto">
@@ -107,6 +108,7 @@ import { ref, onMounted } from 'vue'
 import { User, Code2, CheckCircle2, Briefcase, Rocket, Building2, Trophy } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { getExperiences } from '../api/content'
+import BackgroundCodeflow from '../components/BackgroundCodeflow.vue'
 import type { Experience } from '../types/content'
 import avatarUrl from '../assets/touxiangv1.jpg'
 import {

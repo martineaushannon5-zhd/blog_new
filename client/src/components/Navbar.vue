@@ -107,7 +107,7 @@
           {{ $t('nav.logout') }}
         </button>
 
-        <a href="https://github.com/kingstondantesz1thkg-rgb/zhd.git" target="_blank" class="p-2 glass-panel hover-glass !rounded-full ml-2">
+        <a href="https://github.com/martineaushannon5-zhd/blog_new" target="_blank" class="p-2 glass-panel hover-glass !rounded-full ml-2">
           <Github class="w-4 h-4" />
         </a>
       </nav>

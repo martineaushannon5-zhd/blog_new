@@ -1,24 +1,6 @@
 <template>
   <div class="relative">
-    <Teleport to="body">
-      <div
-        v-if="showIntroVideo"
-        class="fixed inset-0 z-[100] overflow-hidden bg-black transition-opacity duration-700"
-        :class="introVideoFading ? 'opacity-0 pointer-events-none' : 'opacity-100'"
-      >
-        <video
-          ref="heroVideoRef"
-          class="h-full w-full object-cover"
-          :src="homeHeroVideo"
-          autoplay
-          muted
-          playsinline
-          preload="auto"
-          @ended="handleHeroVideoEnded"
-        ></video>
-        <div class="absolute inset-0 bg-black/18"></div>
-      </div>
-    </Teleport>
+    <BackgroundCodeflow />
     <div class="relative z-10 space-y-24">
     <section class="min-h-[calc(100vh-6rem)] flex flex-col">
       <div class="flex-1 flex flex-col justify-center items-start relative pb-10 md:pb-12">
@@ -59,7 +41,7 @@
             {{ $t('home.btnExplore') }}
           </router-link>
           <a
-            href="https://github.com/kingstondantesz1thkg-rgb"
+            href="https://github.com/martineaushannon5-zhd"
             target="_blank"
             class="flex overflow-hidden items-center text-sm font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-black text-[#fff] shadow hover:bg-black/90 h-14 px-8 py-4 max-w-52 whitespace-pre md:flex group relative justify-center gap-2 rounded-xl transition-all duration-300 ease-out hover:ring-2 hover:ring-black hover:ring-offset-2"
           >
@@ -194,7 +176,7 @@ import { ArrowRight } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { getPosts } from '../api/content'
-import homeHeroVideo from '../assets/home/home1.mp4'
+import BackgroundCodeflow from '../components/BackgroundCodeflow.vue'
 import scrollDownArrow from '../assets/home/scroll-down-arrow.png'
 import type { Post } from '../types/content'
 import { formatDate } from '../utils/format'
@@ -207,12 +189,7 @@ const loading = ref(true)
 const error = ref('')
 const nextSectionRef = ref<HTMLElement | null>(null)
 const showScrollDivider = ref(false)
-const heroVideoRef = ref<HTMLVideoElement | null>(null)
-const showIntroVideo = ref(true)
-const introVideoFading = ref(false)
 let scrollDividerTimer: number | undefined
-let introVideoHideTimer: number | undefined
-let previousBodyOverflow = ''
 
 const meta = computed(() => {
   const categories = new Set(
@@ -243,14 +220,6 @@ function scrollToNextSection() {
   window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' })
 }
 
-function handleHeroVideoEnded() {
-  introVideoFading.value = true
-  document.body.style.overflow = previousBodyOverflow
-  introVideoHideTimer = window.setTimeout(() => {
-    showIntroVideo.value = false
-  }, 700)
-}
-
 async function loadPosts() {
   loading.value = true
   error.value = ''
@@ -267,8 +236,6 @@ async function loadPosts() {
 }
 
 onMounted(() => {
-  previousBodyOverflow = document.body.style.overflow
-  document.body.style.overflow = 'hidden'
   loadPosts()
   scrollDividerTimer = window.setTimeout(() => {
     showScrollDivider.value = true
@@ -279,11 +246,5 @@ onBeforeUnmount(() => {
   if (scrollDividerTimer) {
     window.clearTimeout(scrollDividerTimer)
   }
-
-  if (introVideoHideTimer) {
-    window.clearTimeout(introVideoHideTimer)
-  }
-
-  document.body.style.overflow = previousBodyOverflow
 })
 </script>

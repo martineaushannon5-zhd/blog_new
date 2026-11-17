@@ -1,12 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../views/Home.vue'
-import About from '../views/About.vue'
-import Posts from '../views/Posts.vue'
-import PostDetail from '../views/PostDetail.vue'
-import Sponsor from '../views/Sponsor.vue'
-import Cooperation from '../views/Cooperation.vue'
-import AdminLogin from '../views/admin/AdminLogin.vue'
-import AdminDashboard from '../views/admin/AdminDashboard.vue'
+
+const About = () => import('../views/About.vue')
+const Posts = () => import('../views/Posts.vue')
+const PostDetail = () => import('../views/PostDetail.vue')
+const Sponsor = () => import('../views/Sponsor.vue')
+const Cooperation = () => import('../views/Cooperation.vue')
+const AdminLogin = () => import('../views/admin/AdminLogin.vue')
+const AdminDashboard = () => import('../views/admin/AdminDashboard.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

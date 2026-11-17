@@ -14,6 +14,9 @@ const postSchema = new mongoose.Schema(
     category: { ...localizedField, default: 'Uncategorized' },
     tags: { type: [String], default: [] },
     coverImage: { type: String, default: '' },
+    demoVideo: { type: String, default: '' },
+    demoPoster: { type: String, default: '' },
+    projectUrl: { type: String, default: '' },
     isPublished: { type: Boolean, default: true }
   },
   { timestamps: true }
@@ -36,6 +39,379 @@ const Experience =
   mongoose.models.Experience || mongoose.model('Experience', experienceSchema);
 
 const memoryPosts = [
+  {
+    _id: '685a00000000000000000002',
+    title: {
+      zh: '自习室预约系统：用区间重叠校验解决抢座超卖',
+      en: 'Study Room Booking: Preventing Seat Overselling with Interval-Overlap Checks'
+    },
+    content: {
+      zh: `# 自习室预约系统：用区间重叠校验解决抢座超卖
+
+这个项目是一个前后端分离的自习室座位预约平台：学生按时间段选座、签到、取消，管理端做用户、座位、预约与公告管理，并配 ECharts 数据看板。这里重点记录我在"防止座位超卖与重复预约"上的设计与实现。
+
+## 技术栈
+
+- 前端：Vue 3 + TypeScript + Vite + Element Plus + Tailwind CSS + Pinia + ECharts
+- 后端：FastAPI（异步）+ SQLAlchemy 2.0 异步 ORM + aiomysql + Pydantic v2
+- 数据库：MySQL / TiDB Cloud（公网 TLS）
+- 部署：前端 Vercel、后端 Render、数据库 TiDB Cloud 三地分离
+
+## 数据模型
+
+四张核心表：\`user\`、\`room\`、\`seat\`、\`reservation\`。预约表记录 \`user_id\`、\`seat_id\`、\`date\`、\`start_time\`、\`end_time\` 与 \`status\`，外键级联删除，座位带 \`status\`（正常/维护）与 \`has_power\` 属性。
+
+## 核心：防超卖的区间重叠校验
+
+抢座场景最怕两件事：同一座位同一时间段被约两次（超卖），以及同一用户在同一时间段约多个座位。我用经典的时间区间重叠谓词来解决：两个区间 \`[s1,e1)\` 与 \`[s2,e2)\` 重叠，当且仅当 \`s1 < e2 且 e1 > s2\`。
+
+对"座位"维度查询是否已有活跃预约与之重叠：
+
+\`\`\`python
+select(Reservation).where(
+    Reservation.seat_id == new.seat_id,
+    Reservation.date == new.date,
+    Reservation.status.in_(ACTIVE_STATUSES),
+    Reservation.start_time < new.end_time,
+    Reservation.end_time > new.start_time,
+)
+\`\`\`
+
+对"用户"维度做同样的重叠查询，防止一人多约；若查到的记录与本次完全相同（同座位同起止），则识别为重复提交并给出专门提示。任一校验命中即返回 400，拒绝落库。
+
+在此之前还有边界校验：拒绝过去日期、要求结束时间晚于开始时间、座位必须处于可预约状态。
+
+## 预约状态机
+
+预约有四个状态：\`pending\`（待使用）→ \`active\`（使用中，签到触发）→ \`completed\`（已完成），以及任意时刻可 \`cancelled\`（取消）。只有活跃状态（pending/active）参与冲突校验，已取消/已完成的记录不占用时间段，从而允许同一座位在不同时段被复用。
+
+## 异步与部署
+
+后端全链路异步：FastAPI + async SQLAlchemy + aiomysql，启动时 \`create_all\` 自动补齐表结构，OpenAPI 自动生成交互文档用于联调。部署上把前端放 Vercel、后端放 Render、数据库放 TiDB Cloud，通过环境变量 \`VITE_API_BASE_URL\` 与 \`DATABASE_URL\` 串联，贴近真实生产的拆分方式。
+
+## 收获
+
+这个项目让我把"并发冲突"从概念落到了具体的 SQL 谓词与状态机设计上：用区间重叠条件把超卖挡在数据库查询层，用状态机管理预约生命周期，再用异步栈与分离部署保证性能与可维护性。它是我在 Python 全栈方向上一个完整、可答辩的落地作品。`,
+      en: `# Study Room Booking: Preventing Seat Overselling with Interval-Overlap Checks
+
+This project is a separated front/back-end study-room seat reservation platform: students book time slots, check in and cancel; admins manage users, seats, reservations and notices, with an ECharts dashboard. Here I focus on how I prevented seat overselling and double-booking.
+
+## Tech Stack
+
+- Frontend: Vue 3 + TypeScript + Vite + Element Plus + Tailwind CSS + Pinia + ECharts
+- Backend: async FastAPI + SQLAlchemy 2.0 async ORM + aiomysql + Pydantic v2
+- Database: MySQL / TiDB Cloud (public TLS)
+- Deployment: front-end on Vercel, API on Render, DB on TiDB Cloud
+
+## Data Model
+
+Four core tables: \`user\`, \`room\`, \`seat\`, \`reservation\`. A reservation stores \`user_id\`, \`seat_id\`, \`date\`, \`start_time\`, \`end_time\` and \`status\`, with cascade foreign keys; seats carry a \`status\` (normal/maintenance) and \`has_power\` flag.
+
+## Core: Interval-Overlap Checks Against Overselling
+
+Two failures matter most in seat grabbing: the same seat booked twice for the same slot (overselling), and one user holding multiple seats in the same slot. I use the classic interval-overlap predicate: \`[s1,e1)\` and \`[s2,e2)\` overlap iff \`s1 < e2 AND e1 > s2\`.
+
+For the seat dimension, query existing active reservations that overlap:
+
+\`\`\`python
+select(Reservation).where(
+    Reservation.seat_id == new.seat_id,
+    Reservation.date == new.date,
+    Reservation.status.in_(ACTIVE_STATUSES),
+    Reservation.start_time < new.end_time,
+    Reservation.end_time > new.start_time,
+)
+\`\`\`
+
+Run the same overlap query on the user dimension to prevent one person holding several seats; if the matched record is identical (same seat, same start/end), treat it as a duplicate submission with a dedicated message. Any hit returns 400 and rejects the write.
+
+Boundary checks run first: reject past dates, require end > start, and require the seat to be bookable.
+
+## Reservation State Machine
+
+Four states: \`pending\` -> \`active\` (on check-in) -> \`completed\`, plus \`cancelled\` at any time. Only active states (pending/active) participate in conflict checks, so cancelled/completed records free the slot for reuse in other periods.
+
+## Async & Deployment
+
+The backend is fully async: FastAPI + async SQLAlchemy + aiomysql, with \`create_all\` on startup and auto-generated OpenAPI docs for integration. Deployment splits front-end (Vercel), API (Render) and DB (TiDB Cloud), wired via \`VITE_API_BASE_URL\` and \`DATABASE_URL\`, mirroring real production topology.
+
+## Takeaways
+
+This project turned "concurrency conflict" from a concept into concrete SQL predicates and a state machine: the overlap condition stops overselling at the query layer, the state machine governs the reservation lifecycle, and the async stack plus separated deployment keep it performant and maintainable. It is a complete, defensible Python full-stack deliverable.`
+    },
+    summary: {
+      zh: '基于 FastAPI + SQLAlchemy 异步栈的自习室预约系统，重点讲解用时间区间重叠谓词防止座位超卖与重复预约，以及预约状态机与三地分离部署。',
+      en: 'A FastAPI + async SQLAlchemy study-room booking system, focusing on interval-overlap predicates to prevent overselling and double-booking, plus a reservation state machine and three-tier deployment.'
+    },
+    category: {
+      zh: '后端',
+      en: 'Backend'
+    },
+    tags: ['fastapi', 'sqlalchemy', 'async', 'mysql', 'tidb', 'vue', 'element-plus', 'echarts', 'concurrency'],
+    coverImage: '',
+    isPublished: true,
+    createdAt: new Date('2026-11-17T12:00:00.000Z'),
+    updatedAt: new Date('2026-11-17T12:00:00.000Z')
+  },
+{
+    _id: '691b7c5a0000000000000001',
+    title: {
+      zh: 'Yoji 三端开发实录：从 Electron 安装失败到 OSS 迁移',
+      en: 'Building Yoji: From a Broken Electron Installer to Object Storage'
+    },
+    content: {
+      zh: `# Yoji 三端开发实录：从 Electron 安装失败到 OSS 迁移
+
+Yoji（要记单词）是我这学期做的三端项目：鸿蒙 App 负责背单词和视频学习，Node 后台提供接口与数据，Windows 管理端负责运营。线上地址是 yoji.zhdstudy.cyou。
+
+这篇文章不复述功能列表，只记录开发过程中真正卡住我的问题和最后沉淀下来的做法。
+
+## 项目结构
+
+- 鸿蒙 App：ArkTS / ArkUI，卡片学习、选择题复习、错词本、学习日历、视频学习
+- 后台：Node 24 + Express + node:sqlite，单文件数据库，JWT 鉴权
+- 管理端：Next.js 14 静态导出 + Electron，仪表盘、用户、视频、词库、审计日志
+
+三端共享同一套接口，管理端打包成 Windows 安装包，App 通过 HTTP 拉数据。
+
+## 一、安装完成后打不开：Cannot find module electron-serve
+
+现象：安装包能装，但一启动就弹主进程异常：
+
+A JavaScript error occurred in the main process
+Error: Cannot find module 'electron-serve'
+
+排查：主进程用 require 加载 electron-serve 来做静态文件服务，但这个包被放在 devDependencies。electron-builder 只会把 dependencies 打进 asar，所以开发环境能跑，装完就缺模块。另外这个包是纯 ESM，在 CommonJS 主进程里 require 本身也不稳。
+
+修复：不再依赖第三方包，直接用 Electron 内置的 protocol.handle 注册自定义协议 app://，从打包目录读取 out 下的静态文件。处理了四件事：目录映射到 index.html、path.relative 防止路径穿越、带扩展名但文件不存在返回 404、其余路径回退到 index.html 支持前端路由。
+
+经验：Electron 运行时需要的包必须放在 dependencies；Next 静态导出后其实不需要任何运行时 node_modules。
+
+## 二、169MB 的安装包
+
+第一版安装包 169MB，asar 151MB。解包后发现 asar 里有 17785 个 node_modules 文件，next、react、recharts 全被打进去了，而真正需要的只有 out 里的静态页面。
+
+处理：把全部生产依赖移到 devDependencies，build.files 只保留 out、main.js、package.json，开启 asar 和 maximum 压缩，electronLanguages 只留 zh-CN 和 en-US。
+
+结果：asar 从 151MB 降到 1.9MB，安装包从 169MB 降到 113MB，安装时间明显缩短。
+
+经验：安装包大小由依赖归属决定，不由源码行数决定。静态导出的前端，构建产物就是全部运行时。
+
+## 三、真正让打包失败的，是文件 ACL
+
+体积问题解决后，NSIS 仍然在最后一步失败：
+
+Error: process failed 2
+
+换输出目录后 7za 报 cannot open file，System ERROR: 拒绝访问。同一个 shell 里 echo 写文件却成功，说明不是普通权限。
+
+用 icacls 检查发现项目根目录带一条显式的 Everyone 拒绝 ACE，整棵树还带着 Low Mandatory Level 完整性标签——这是之前沙箱工具留下的。低完整性进程无法写工作区外的普通目录，NSIS 在写卸载程序时失败，于是退出码 2。
+
+修复：移除 Everyone 的拒绝项，把目录树的完整性级别重置为 Medium。之后打包一次通过。
+
+期间还遇到 asar 被其他进程占用（EBUSY），mv 和删除都报 Device or resource busy。最后的做法不是杀进程，而是换一个新的输出目录，让旧文件留在那里。
+
+经验：Windows 上的“拒绝访问”不一定是权限，也可能是完整性级别；被占用的构建产物，换目录比硬删更安全。
+
+## 四、把后台从“能用”做到“合格”
+
+后台最初只有 CRUD。为了让它像一个真正的运营后台，补了几块：
+
+- 审计日志：登录成功/失败、删除用户、上传/修改/删除视频与词表、导出用户，全部落库，带操作人、对象、IP、时间
+- 用户导出：CSV 带 BOM 和 RFC4180 转义，Excel 打开不乱码
+- 接口文档：OpenAPI 3.0.3，提供 /api 索引、/api/openapi.json、/api/docs（Swagger UI）
+- 修掉 /api 无斜杠时的 301：Nginx 增加精确匹配的 location
+
+经验：接口文档最好和代码放在一起生成，并且用真实路由数量核对；改字段时同步改文档，否则很快就漂移。
+
+## 五、把 650MB 视频搬出服务器
+
+服务器是 2C2G，公网带宽只有 1–5Mbps，30MB 的视频就能把带宽打满；磁盘里 655MB 媒体文件也占地方。
+
+先纠正一个概念：视频占的是磁盘和带宽，不是内存。2C2G 的瓶颈在带宽，不在内存。
+
+方案：阿里云 OSS 私有桶 + 桶策略只允许匿名 GetObject；配置 CORS 供浏览器直传；服务端用 AK 生成上传 policy 和签名，浏览器直接 PUT 到 OSS；数据库存绝对 URL；存量文件用 ossutil 内网迁移；最后用脚本批量改库并备份。
+
+迁移结果：22 个文件、685MB，内网 5.2 秒传完；6 个视频和 6 张缩略图逐个验证 200/206。
+
+经验：迁移方案必须包含回滚脚本，不能只有正向脚本；数据库里存相对路径，迁移时只改库，客户端不用发版。
+
+## 六、OSS 突然返回 UserDisable
+
+迁移完成第二天，后台视频页 6 张缩略图全部裂开，浏览器报 ERR_BLOCKED_BY_ORB。
+
+排查：curl 缩略图返回 403，响应体是 Code=UserDisable、EC=0003-00000801；带签名的 ossutil 请求同样被拒；但同一个 AccessKey 调 STS 仍然正常。说明不是桶策略，也不是 RAM 用户被删，而是账号在 OSS 服务层被停用（常见原因：欠费、风控、违规）。
+
+处置：把数据库里的视频地址改回 /media 相对路径，注释 OSS 环境变量，重启服务。后台恢复本地模式，缩略图立刻正常，站点和 App 都没有中断。等账号恢复后再把环境变量打开、跑一次正向改库脚本即可。
+
+经验：跨域图片报 ORB 时先看响应体，不要先怀疑前端；云服务要把“可回滚”设计进数据模型。
+
+## 七、鸿蒙端：沉浸式与系统组件
+
+顶部和底部一开始没有沉浸式，状态栏是灰的。处理方式是：窗口开启全屏布局，读取状态栏和导航条的安全区高度，写进 AppStorage，页面内容按高度加 padding，底部 TabBar 的 margin 跟随导航条高度。这样不用改每个页面，只在首页统一处理。
+
+原本想换成华为的 HdsTabs / HdsNavigation，查 SDK 发现这两个组件是 6.0.0(20) 才引入的，而项目 compatibleSdkVersion 是 5.0.2(14)。直接换会让 5.x 设备崩溃，所以暂时保留自绘 TabBar，把升级 min API 作为后续项。
+
+另外补了错词本和 6 级间隔复习：答错进入错词本并清零等级，答对升级，间隔为 1/2/4/7/15/30 天，满级视为掌握。数据落在本地 Store，同时扩展了进度快照。
+
+经验：跨端同步的进度快照是白名单契约，App 模型和后端 sanitize/merge 必须同时改，否则新字段上云会被静默丢掉。
+
+## 八、构建环境的两个小坑
+
+- ArkTS 编译通过不代表能打包，PackageHap 还需要 Java；JAVA_HOME 指向带空格的 Program Files 路径时会报 spawn java ENOENT，用 junction 建一个短路径即可
+- 本机 shell 里存在 ELECTRON_RUN_AS_NODE 时，直接运行 Electron 可执行文件会变成 Node，调试时要先 unset
+
+## 九、十条经验
+
+1. 先复现再修，响应体和日志比猜测快
+2. 安装包大小看依赖归属，不看源码
+3. Windows 权限问题要查完整性级别
+4. Electron 静态资源用内置协议，少引第三方 serve
+5. 数据库存相对路径，迁移只改库
+6. 迁移脚本默认 dry-run，写库前自动备份
+7. 接口文档随代码生成，并用路由数核对
+8. 云服务故障先回滚保可用，再定位原因
+9. 跨端字段是契约，白名单必须同步
+10. 文档写“为什么”，不只写“怎么做”
+
+## 写在最后
+
+这个项目让我第一次把 App、后台、桌面端、对象存储和 CDN 的链路完整跑通。比起多写几个页面，更有价值的是学会了怎么在出问题时快速定位、怎么把一次修复沉淀成可复用的流程。
+
+下一步准备继续补 App 的拼写和听音模式，以及后台的发布回滚能力。`,
+      en: `# Building Yoji: From a Broken Electron Installer to Object Storage
+
+Yoji is a three-part vocabulary learning project: a HarmonyOS app for learning and video lessons, a Node backend for APIs and data, and a Windows admin console for operations. It runs at yoji.zhdstudy.cyou.
+
+This post is not a feature list. It records the problems that actually blocked me and the practices I kept afterwards.
+
+## Structure
+
+- HarmonyOS app: ArkTS / ArkUI, flashcards, quizzes, wrong-word book, calendar, video learning
+- Backend: Node 24 + Express + node:sqlite, single-file database, JWT auth
+- Admin: Next.js 14 static export + Electron, dashboard, users, videos, wordbooks, audit log
+
+All three share one API. The admin ships as a Windows installer, and the app pulls data over HTTP.
+
+## 1. The installer opened to a missing module
+
+The app installed fine but crashed on launch with:
+
+A JavaScript error occurred in the main process
+Error: Cannot find module 'electron-serve'
+
+The main process required electron-serve to serve static files, but the package sat in devDependencies. electron-builder only packs dependencies, so it worked in development and disappeared after packaging. The package is also pure ESM, which is awkward to require from a CommonJS main process.
+
+Fix: drop the package and register a custom app:// protocol with Electron's built-in protocol.handle. The handler maps directories to index.html, blocks path traversal with path.relative, returns 404 for missing files with extensions, and falls back to index.html for client-side routes.
+
+Lesson: anything the packaged app needs at runtime belongs in dependencies. A statically exported Next app needs no runtime node_modules at all.
+
+## 2. A 169MB installer
+
+The first installer was 169MB, with a 151MB asar. Unpacking it showed 17,785 node_modules files inside: next, react, recharts. The app only needed the exported out folder.
+
+Fix: move all production dependencies to devDependencies, keep only out, main.js and package.json in build.files, enable asar and maximum compression, and limit electronLanguages to zh-CN and en-US.
+
+Result: asar dropped from 151MB to 1.9MB, the installer from 169MB to 113MB, and installation became noticeably faster.
+
+Lesson: installer size follows dependency ownership, not source size.
+
+## 3. The real packaging failure was a file ACL
+
+After shrinking the package, NSIS still failed at the last step with process failed 2. Building to another directory produced 7za errors: cannot open file, System ERROR: access denied. Writing a file with echo in the same shell worked, so it was not ordinary permissions.
+
+icacls showed an explicit deny ACE for Everyone on the project root, and the whole tree carried a Low Mandatory Level integrity label, left over from an earlier sandbox tool. Low-integrity processes cannot write to normal directories outside the workspace, so NSIS failed while writing the uninstaller and exited with code 2.
+
+Fix: remove the deny ACE and reset the tree to Medium integrity. Packaging then succeeded on the first try.
+
+We also hit EBUSY because another process held app.asar open; mv and delete both reported Device or resource busy. Instead of killing the process, I built into a fresh output directory.
+
+Lesson: on Windows, access denied can mean integrity level, not permissions; for locked build artifacts, switching output directories is safer than force-deleting.
+
+## 4. Making the admin console production-grade
+
+The admin started as plain CRUD. To make it a real operations console, I added:
+
+- Audit log: login success/failure, user deletion, video and wordbook changes, CSV export, with operator, target, IP and time
+- CSV export with BOM and RFC4180 escaping so Excel opens it correctly
+- OpenAPI 3.0.3 docs: an /api index, /api/openapi.json and /api/docs with Swagger UI
+- A fix for the 301 on /api without a trailing slash, using an exact Nginx location
+
+Lesson: generate API docs next to the code and verify them against the real route count; update them with every field change or they drift immediately.
+
+## 5. Moving 650MB of video off the server
+
+The server has 2 vCPUs, 2GB RAM and only 1-5Mbps of public bandwidth, so a 30MB video can saturate it. The disk also held 655MB of media.
+
+First, a correction: video consumes disk and bandwidth, not memory. The bottleneck was bandwidth.
+
+Plan: a private OSS bucket with a bucket policy allowing anonymous GetObject only; CORS for browser uploads; a backend endpoint that signs an upload policy so the browser can PUT directly; absolute URLs in the database; ossutil over the internal network for existing files; and a script to rewrite the database with a backup.
+
+Result: 22 files and 685MB transferred in 5.2 seconds over the internal network; all six videos and six thumbnails verified with 200/206 responses.
+
+Lesson: a migration plan needs a rollback script, not just a forward script. Storing relative paths in the database meant switching back required only a database update, with no client release.
+
+## 6. OSS started returning UserDisable
+
+The next day, all six thumbnails broke and the browser reported ERR_BLOCKED_BY_ORB.
+
+curl returned 403 with Code=UserDisable and EC=0003-00000801. Signed ossutil requests failed the same way, while STS GetCallerIdentity still returned 200. That ruled out bucket policy and a deleted RAM user: the account had been suspended at the OSS service layer, typically due to unpaid bills, risk control or a violation.
+
+Response: rewrite the database URLs back to /media, comment out the OSS environment variables, restart. The console fell back to local mode, thumbnails recovered immediately, and neither the site nor the app went down. Once the account is restored, re-enable the variables and run the forward rewrite again.
+
+Lesson: when a cross-origin image is blocked by ORB, read the response body first instead of blaming the frontend. Design rollback into the data model.
+
+## 7. HarmonyOS: immersive layout and system components
+
+The status bar was not immersive at first. The fix: enable full-screen layout, read the status bar and navigation indicator insets, store them in AppStorage, pad page content accordingly, and offset the tab bar by the navigation inset. This keeps the change in one place instead of every page.
+
+I considered Huawei's HdsTabs and HdsNavigation, but the SDK marks them as 6.0.0(20), while the project targets compatibleSdkVersion 5.0.2(14). Switching would crash 5.x devices, so the custom tab bar stays and raising the minimum API is a later task.
+
+I also added a wrong-word book and six-level spaced repetition: a wrong answer resets the level and schedules tomorrow, a correct answer raises it, with intervals of 1/2/4/7/15/30 days and mastery at the top level. Data lives in the local store and extends the progress snapshot.
+
+Lesson: a cross-device progress snapshot is a whitelist contract. The app model and the backend sanitize/merge logic must change together, or new fields are silently dropped on sync.
+
+## 8. Two build-environment traps
+
+- ArkTS compilation passing does not mean packaging will: PackageHap needs Java. When JAVA_HOME points to a path with spaces under Program Files, it fails with spawn java ENOENT; a junction to a short path fixes it.
+- If ELECTRON_RUN_AS_NODE is set in the shell, running the Electron binary behaves like Node. Unset it before debugging.
+
+## 9. Ten lessons
+
+1. Reproduce before fixing; response bodies and logs beat guessing
+2. Installer size follows dependency ownership
+3. On Windows, check integrity level for access-denied errors
+4. Use Electron's built-in protocol for static assets
+5. Store relative paths in the database so migration is a database change
+6. Migration scripts should default to dry-run and back up before writing
+7. Generate API docs from code and verify the route count
+8. On cloud outages, roll back for availability first, then diagnose
+9. Cross-device fields are contracts; keep whitelists in sync
+10. Document why, not only how
+
+## Closing
+
+This project let me connect an app, a backend, a desktop client, object storage and a CDN end to end. More valuable than writing more pages was learning how to locate a failure quickly and turn one fix into a reusable process.
+
+Next: spelling and listening modes in the app, and release rollback for the admin console.`
+    },
+    summary: {
+      zh: '记录 Yoji 三端项目从 Electron 安装失败、169MB 安装包、文件 ACL、OSS 迁移到 UserDisable 故障的完整排查过程，以及沉淀下来的十条经验。',
+      en: 'A full record of building Yoji: the broken Electron installer, a 169MB package, file ACL issues, an OSS migration, and the lessons that came out of it.'
+    },
+    category: {
+      zh: '全栈项目',
+      en: 'Full Stack'
+    },
+    tags: ['harmonyos', 'arkts', 'electron', 'nextjs', 'nodejs', 'sqlite', 'oss', 'nginx'],
+    coverImage: '',
+    demoVideo: '/projects/yoji-demo.mp4',
+    demoPoster: '/projects/yoji-poster.jpg',
+    projectUrl: 'https://yoji.zhdstudy.cyou',
+    isPublished: true,
+    createdAt: new Date('2026-11-17T11:45:00.000Z'),
+    updatedAt: new Date('2026-11-17T11:45:00.000Z')
+  },
   {
     _id: '6860b4f00000000000000003',
     title: {
@@ -144,6 +520,9 @@ If I used to learn technologies separately, \`zhdstudy.cloud\` is where I starte
     },
     tags: ['zhdstudy.cloud', 'vue', 'vite', 'typescript', 'nodejs', 'express', 'jwt'],
     coverImage: '',
+    demoVideo: '/projects/zhd-demo.mp4',
+    demoPoster: '/projects/zhd-poster.jpg',
+    projectUrl: 'https://zhdstudy.cloud',
     isPublished: true,
     createdAt: new Date('2026-07-03T09:30:00.000Z'),
     updatedAt: new Date('2026-07-03T09:30:00.000Z')
@@ -199,6 +578,37 @@ If I used to learn technologies separately, \`zhdstudy.cloud\` is where I starte
 ];
 
 const memoryExperiences = [
+{
+    _id: '691b7c5a0000000000000002',
+    projectName: {
+      zh: 'Yoji.（要记单词）三端学习应用',
+      en: 'Yoji Vocabulary Learning Platform'
+    },
+    techStack: [
+      'HarmonyOS ArkTS',
+      'Node.js',
+      'Express',
+      'SQLite',
+      'Next.js',
+      'Electron',
+      'Aliyun OSS'
+    ],
+    description: {
+      zh: '面向鸿蒙的背单词应用，包含卡片学习、错词本与 6 级间隔复习、视频学习与学习日历，并配套 Node 后台与 Windows 管理端。',
+      en: 'A HarmonyOS vocabulary app with flashcards, a wrong-word book with six-level spaced repetition, video lessons and a study calendar, backed by a Node API and a Windows admin console.'
+    },
+    achievement: {
+      zh: '上线 yoji.zhdstudy.cyou；桌面端安装包从 169MB 降到 113MB；650MB 视频迁移到 OSS；后台补齐审计日志、CSV 导出与 OpenAPI 文档。',
+      en: 'Launched at yoji.zhdstudy.cyou; reduced the desktop installer from 169MB to 113MB; moved 650MB of video to OSS; added audit logs, CSV export and OpenAPI docs to the admin.'
+    },
+    duration: {
+      zh: '2026.10 - 至今',
+      en: '2026.10 - Present'
+    },
+    sortOrder: 0,
+    createdAt: new Date('2026-11-17T11:45:00.000Z'),
+    updatedAt: new Date('2026-11-17T11:45:00.000Z')
+  },
   {
     _id: '682b4a710000000000000101',
     projectName: {
@@ -221,6 +631,44 @@ const memoryExperiences = [
     sortOrder: 1,
     createdAt: new Date('2026-05-19T09:00:00.000Z'),
     updatedAt: new Date('2026-05-19T09:00:00.000Z')
+  },
+  {
+    _id: '685a00000000000000000001',
+    projectName: {
+      zh: '自习室预约管理系统（Python 全栈）',
+      en: 'Study Room Reservation System (Python Full-Stack)'
+    },
+    techStack: [
+      'Vue 3',
+      'TypeScript',
+      'Vite',
+      'Element Plus',
+      'Tailwind CSS',
+      'Pinia',
+      'ECharts',
+      'FastAPI',
+      'SQLAlchemy 2.0 (Async)',
+      'aiomysql',
+      'Pydantic v2',
+      'MySQL / TiDB Cloud',
+      'Vercel',
+      'Render'
+    ],
+    description: {
+      zh: '前后端分离的自习室座位预约平台，单入口按角色渲染学生端与管理端：学生可按时间段选座预约、签到、取消、看公告与提反馈；管理端含 ECharts 数据看板与用户/自习室/座位/预约/公告/留言管理。后端 FastAPI 异步 + SQLAlchemy 2.0 异步 ORM + aiomysql 连接 MySQL/TiDB Cloud。',
+      en: 'A separated front/back-end study-room seat reservation platform. One entry renders student vs admin views by role: students book time slots, check in, cancel, read notices and send feedback; admins get an ECharts dashboard plus user/room/seat/reservation/notice/feedback management. Backend uses async FastAPI + SQLAlchemy 2.0 async ORM + aiomysql over MySQL/TiDB Cloud.'
+    },
+    achievement: {
+      zh: '用时间区间重叠谓词（start < end′ 且 end > start′）做座位防超卖与一人多约校验；实现 pending/active/completed/cancelled 预约状态机与签到/取消流转；前端 Vercel、后端 Render、数据库 TiDB Cloud 三地分离部署并经公网 TLS 连接，OpenAPI 自动文档联调。',
+      en: 'Prevented seat overselling and double-booking via an interval-overlap predicate (start < end′ AND end > start′); built a pending/active/completed/cancelled reservation state machine with check-in/cancel transitions; deployed front-end on Vercel, API on Render and DB on TiDB Cloud over public TLS, integrated via auto-generated OpenAPI docs.'
+    },
+    duration: {
+      zh: '2026.06 - 2026.07',
+      en: '2026.06 - 2026.07'
+    },
+    sortOrder: 2,
+    createdAt: new Date('2026-07-05T12:00:00.000Z'),
+    updatedAt: new Date('2026-07-05T12:00:00.000Z')
   }
 ];
 
@@ -363,6 +811,9 @@ async function createPost(payload) {
     category: document.category || 'Uncategorized',
     tags: document.tags,
     coverImage: document.coverImage || '',
+    demoVideo: document.demoVideo || '',
+    demoPoster: document.demoPoster || '',
+    projectUrl: document.projectUrl || '',
     isPublished: document.isPublished ?? true,
     createdAt: now,
     updatedAt: now
