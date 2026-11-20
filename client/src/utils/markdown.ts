@@ -14,10 +14,10 @@ function parseInline(value: string) {
 
 export function renderMarkdown(source: string) {
   const escaped = escapeHtml(source || '')
-  const fencePattern = /```([\s\S]*?)```/g
+  const fencePattern = /```([a-zA-Z0-9_+-]*)[ \t]*\r?\n?([\s\S]*?)```/g
   const fences: string[] = []
 
-  const text = escaped.replace(fencePattern, (_, code: string) => {
+  const text = escaped.replace(fencePattern, (_match, _lang: string, code: string) => {
     const html = `<pre class="overflow-x-auto rounded-2xl p-4 border border-white/10"><code>${code.trim()}</code></pre>`
     fences.push(html)
     return `__CODE_BLOCK_${fences.length - 1}__`

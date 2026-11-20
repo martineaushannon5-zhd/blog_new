@@ -53,9 +53,10 @@
         </a>
       </section>
 
-      <div class="prose prose-invert prose-emerald max-w-none">
-        <div v-html="parsedContent"></div>
-      </div>
+      <template v-for="(block, index) in contentBlocks" :key="index">
+        <div class="prose prose-invert prose-emerald max-w-none" v-html="block.html"></div>
+        <CorsLab v-if="block.widget" />
+      </template>
     </div>
   </div>
 </template>
@@ -67,9 +68,12 @@ import { ArrowLeft, ExternalLink, MonitorPlay } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import { getPostById } from '../api/content'
 import type { Post } from '../types/content'
+import CorsLab from '../components/CorsLab.vue'
 import { formatDate } from '../utils/format'
 import { getPostCategory, getPostContent, getPostTitle } from '../utils/content'
 import { renderMarkdown } from '../utils/markdown'
+
+const WIDGET_MARKER = '[[cors-lab]]'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -77,9 +81,13 @@ const post = ref<Post | null>(null)
 const loading = ref(true)
 const error = ref('')
 
-const parsedContent = computed(() => {
-  if (!post.value?.content) return ''
-  return renderMarkdown(getPostContent(post.value, locale.value))
+const contentBlocks = computed(() => {
+  if (!post.value?.content) return []
+  const chunks = getPostContent(post.value, locale.value).split(WIDGET_MARKER)
+  return chunks.map((chunk, index) => ({
+    html: renderMarkdown(chunk),
+    widget: index < chunks.length - 1
+  }))
 })
 
 async function loadPost() {

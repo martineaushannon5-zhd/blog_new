@@ -40,6 +40,356 @@ const Experience =
 
 const memoryPosts = [
   {
+    _id: '691f3d210000000000000004',
+    title: {
+      zh: '跨域（CORS）实战：让 blog.zhdstudy.cloud 直接请求 yoji.zhdstudy.cyou',
+      en: 'CORS in Practice: Calling yoji.zhdstudy.cyou Straight from blog.zhdstudy.cloud'
+    },
+    content: {
+      zh: `# 跨域（CORS）实战：让 blog.zhdstudy.cloud 直接请求 yoji.zhdstudy.cyou
+
+我手上正好有两个线上项目：这个博客 [blog.zhdstudy.cloud](https://blog.zhdstudy.cloud)（Vue 3 + Express），和 Yoji 背单词后台 [yoji.zhdstudy.cyou](https://yoji.zhdstudy.cyou)（Next.js 前端 + Express API）。两者协议都是 https，但主机名不同 —— 这就足够构成跨域。
+
+这篇文章不背定义：下面的"跨域实验室"会让当前页面真实发出 5 个 fetch，有的能读到响应，有的会被浏览器拦下来。跑完再回头解释为什么，以及生产里三种放行方式各自要注意什么。
+
+## 同源策略只看三件事
+
+- 协议、主机名、端口三者完全相同才算同源，任何一个不同就是跨域。
+- \`https://blog.zhdstudy.cloud\` 与 \`https://yoji.zhdstudy.cyou\`：主机名不同 → 跨域。
+- \`https://zhdstudy.cloud\` 与 \`https://www.zhdstudy.cloud\` 同样是跨域，www 是主机名的一部分。
+- 跨域限制是**浏览器**的行为。用 curl、Postman 或你自己的服务端去请求同一个地址，永远不会被"跨域"拦住 —— 服务端之间没有同源策略。
+- 所以 CORS 报错不等于请求没发出去。下面第 4 个场景里，请求其实已经到达 yoji 的 nginx 并被正常处理（对方日志里有记录），只是浏览器在把响应交给 JS 之前检查了响应头，决定不给你看。
+
+## 动手：这一页真实发出的请求
+
+[[cors-lab]]
+
+## 五个场景，两种结果
+
+**场景 1：同源对照。** 请求本站 \`/api/health\`，协议、域名、端口全一致，压根不进入 CORS 流程。留着它是为了说明：跨域不是"请求外网"，而是"换了源"。
+
+**场景 2：普通跨域 GET，成功。** 用 curl 能看到浏览器看到的东西：
+
+\`\`\`
+curl -i -H "Origin: https://blog.zhdstudy.cloud" https://yoji.zhdstudy.cyou/healthz
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: https://blog.zhdstudy.cloud
+Vary: Origin
+
+{"status":"ok","uptime":376765,"time":"2026-11-20T09:34:37.862Z"}
+\`\`\`
+
+- \`Access-Control-Allow-Origin\` 是唯一的通行证：服务端在响应里声明"我允许这个源读我的响应"。
+- 这里的值不是 \`*\`，而是把我请求头里的 \`Origin\` 原样回显，同时带上 \`Vary: Origin\`。\`Vary\` 不是可有可无的 —— 少了它，CDN 或浏览器缓存可能把 A 源的响应发给 B 源。
+- 一个容易忽略的点：yoji 的 \`/api/health\` 其实是 404（\`{"code":1007,"message":"接口不存在"}\`），但这个 404 **同样带 CORS 头**，因为 \`cors()\` 中间件挂在路由之前，错误响应也走它。反过来如果把 CORS 放在路由后面，前端看到的就会是"接口 404"叠加"跨域被拦"两个问题，排查体验极差。
+
+**场景 3：加一个自定义头，多一次预检。**
+
+\`\`\`
+curl -i -X OPTIONS https://yoji.zhdstudy.cyou/api/ \\
+  -H "Origin: https://blog.zhdstudy.cloud" \\
+  -H "Access-Control-Request-Method: GET" \\
+  -H "Access-Control-Request-Headers: x-requested-with"
+
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: https://blog.zhdstudy.cloud
+Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE
+Access-Control-Allow-Headers: content-type,x-requested-with
+\`\`\`
+
+浏览器眼里的"简单请求"只有这些：方法是 GET / HEAD / POST，请求头只带 Accept、Accept-Language、Content-Language 与 Content-Type（且值限于 \`application/x-www-form-urlencoded\`、\`multipart/form-data\`、\`text/plain\`）。超出这个范围，浏览器会先发一次 OPTIONS 预检：
+
+- 方法是 PUT / PATCH / DELETE → 预检。
+- 带自定义头，比如 \`Authorization\`、\`X-Requested-With\` → 预检。
+- POST 发 \`application/json\` → 预检。这是前后端分离项目里最常见的那条"莫名多出来的请求"。
+- 预检不通过，真实请求根本不会发出：Network 面板里只有一条 OPTIONS，状态显示 CORS error。
+- 预检结果可以被缓存，服务端回 \`Access-Control-Max-Age: 86400\`，浏览器一天内就不会重复预检。
+
+**场景 4：请求首页 HTML，被拦。** 同样是 yoji 这个域名，\`/healthz\`、\`/api/\` 能读，\`/\` 读不了。因为 \`/\` 由 nginx 直接返回 Next.js 的静态 HTML，压根没经过 Node 的 \`cors()\`，响应里没有任何 \`Access-Control-Allow-Origin\`。
+
+结论：**CORS 是逐个响应生效的，不是"这个域名开了跨域"。** 同一台机器上放行 \`/api/\` 而拦住 \`/\`，完全可以并存。
+
+**场景 5：带上 Cookie，照样被拦。** 目标还是刚刚成功的 \`/healthz\`，只是 fetch 加了 \`credentials: 'include'\`。yoji 的 \`cors()\` 没开 credentials，响应里缺 \`Access-Control-Allow-Credentials: true\`，浏览器直接拒绝。带凭证时规则更严：
+
+- \`Access-Control-Allow-Origin\` 不能是 \`*\`，必须是精确的源。
+- 必须有 \`Access-Control-Allow-Credentials: true\`。
+- 前端必须显式 \`credentials: 'include'\`（axios 里是 \`withCredentials: true\`）。
+- 三者缺一不可，而且跨站 Cookie 本身还得是 \`SameSite=None; Secure\`。
+
+## 为什么这个博客自己不需要配 CORS
+
+博客生产环境的 nginx 里只有这么一段：
+
+\`\`\`
+location /api/ {
+    proxy_pass http://127.0.0.1:4000/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+\`\`\`
+
+- 前端构建时 \`VITE_API_BASE_URL=/api\`，浏览器请求的是 \`https://blog.zhdstudy.cloud/api/posts\` —— 与页面同源，CORS 全程不参与。
+- 这是生产环境最省心的方案：把"跨域"变成"同源 + 服务端转发"，顺带省掉预检、隐藏后端端口、统一上 HTTPS 与限流。
+- 开发环境的等价做法是 Vite 的 \`server.proxy\`，把 \`/api\` 转发到 \`http://localhost:4000\`，浏览器同样只看到同源请求。
+
+## 三种放行方式
+
+### 一、应用层（推荐）
+
+yoji 后端的真实代码，\`server/src/app.js\`：
+
+\`\`\`
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(cors({ origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(',') }));
+\`\`\`
+
+配置来自 \`corsOrigin: process.env.CORS_ORIGIN || '*'\`。
+
+- \`origin: true\` 的含义是"把请求的 Origin 反射回去"，而不是回 \`*\`，这就是 curl 里看到 \`Access-Control-Allow-Origin: https://blog.zhdstudy.cloud\` 的原因。
+- 反射任意 Origin 在**不带凭证**时基本无害（等于公开 API）；但一旦哪天要带 Cookie，就必须换成白名单，否则等于允许任何网站携带用户凭证调用你的接口。
+- 这个博客的后端就是白名单写法：
+
+\`\`\`
+const corsOptions =
+  config.clientOrigin === '*'
+    ? { origin: true, credentials: true }
+    : { origin: config.clientOrigin, credentials: true };
+
+app.use(cors(corsOptions));
+\`\`\`
+
+生产环境 \`CLIENT_ORIGIN=https://blog.zhdstudy.cloud\`，只有它能带凭证跨域访问博客接口。
+
+### 二、nginx 层
+
+应用不方便改，或者连静态资源也要放行时：
+
+\`\`\`
+location /api/ {
+    if ($request_method = OPTIONS) {
+        add_header Access-Control-Allow-Origin $http_origin always;
+        add_header Access-Control-Allow-Methods 'GET,POST,PUT,PATCH,DELETE,OPTIONS' always;
+        add_header Access-Control-Allow-Headers 'Content-Type,Authorization' always;
+        add_header Access-Control-Max-Age 86400 always;
+        return 204;
+    }
+    add_header Access-Control-Allow-Origin $http_origin always;
+    proxy_pass http://127.0.0.1:3000;
+}
+\`\`\`
+
+两个坑我都踩过：
+
+- \`add_header\` 必须带 \`always\`，否则 4xx / 5xx 响应不带 CORS 头，前端看到的是"接口报错"叠加"跨域被拦"。
+- nginx 的 \`add_header\` 有继承规则：location 里只要写了任意一条 \`add_header\`，server / http 层的 \`add_header\` 就全部失效，HSTS 之类的头会跟着一起消失，需要在新 location 里重写一遍。
+- 上面是"反射任意 Origin"的写法，只适合公开只读接口；要收紧就用 \`map $http_origin $cors_origin { ... }\` 做白名单，再把 \`$cors_origin\` 填进去。
+
+### 三、反向代理同源化
+
+见上一节，博客用的就是这个，也是我最推荐的默认选项。
+
+## 排查清单
+
+- 先看 Network 里那条请求的 Response Headers 有没有 \`Access-Control-Allow-Origin\`，值是否**恰好等于**当前页面的源：协议、子域、端口都要对，末尾不能多斜杠，http 与 https 不通用。
+- 有 OPTIONS 就先看 OPTIONS：预检失败，真实请求不会发。检查 \`Access-Control-Allow-Headers\` 是否覆盖你实际发送的每一个自定义头。
+- 4xx / 5xx 也要带 CORS 头：nginx 用 \`always\`，Express 把 \`cors()\` 放在路由与错误处理之前。
+- 带 Cookie 时记住"精确 Origin + Allow-Credentials + 前端 include"三件套，另外 Cookie 要 \`SameSite=None; Secure\`。
+- \`Access-Control-Allow-Origin\` 这类头默认对 JS 不可见（安全列表只有 Cache-Control、Content-Language、Content-Length、Content-Type、Expires、Last-Modified、Pragma），前端要读就得让服务端加 \`Access-Control-Expose-Headers\`。
+- 服务端日志里有请求、浏览器却报 CORS —— 正常现象，说明请求到了，是响应没被放行，别急着重启服务。
+- 改完服务端配置一定用**无痕窗口**复测，浏览器会缓存预检结果，也会缓存失败。
+
+## 小结
+
+- 跨域不是"请求失败"，而是"响应不给 JS 读"。
+- CORS 逐个响应生效，同一域名下 \`/api/\` 放行、\`/\` 不放行可以同时存在。
+- 生产里最稳的做法往往是别跨域：反向代理把接口挂到同源路径下。
+- 必须跨域时优先在应用层配白名单；用 nginx 补则注意 \`always\` 与 \`add_header\` 的继承规则。
+- 带凭证时规则最严，精确 Origin、Allow-Credentials、前端 include 缺一不可。`,
+      en: `# CORS in Practice: Calling yoji.zhdstudy.cyou Straight from blog.zhdstudy.cloud
+
+I happen to run two live projects: this blog, [blog.zhdstudy.cloud](https://blog.zhdstudy.cloud) (Vue 3 + Express), and the Yoji vocabulary admin app, [yoji.zhdstudy.cyou](https://yoji.zhdstudy.cyou) (Next.js front end + Express API). Both speak https, but the hosts differ — which is all it takes to be cross-origin.
+
+No definitions to memorise here: the CORS Lab below fires five real fetch requests from this very page. Some responses come back readable, some are withheld by the browser. Once you have seen both, we explain why, and what to watch out for in each of the three ways to allow cross-origin traffic in production.
+
+## Same-origin comes down to exactly three things
+
+- Protocol, host and port must all match; any single difference makes it cross-origin.
+- \`https://blog.zhdstudy.cloud\` vs \`https://yoji.zhdstudy.cyou\`: different host → cross-origin.
+- \`https://zhdstudy.cloud\` vs \`https://www.zhdstudy.cloud\` is cross-origin too — www is part of the host.
+- The restriction is enforced by the **browser**. curl, Postman or your own backend can call the same URL freely; there is no same-origin policy between servers.
+- So a CORS error does not mean the request never went out. In scenario 4 the request does reach Yoji's nginx and is processed normally (it shows up in their logs) — the browser just inspects the response headers before handing the body to JS, and decides not to.
+
+## Hands-on: requests this page really sends
+
+[[cors-lab]]
+
+## Five scenarios, two outcomes
+
+**Scenario 1: same-origin control.** Calling this site's own \`/api/health\` — identical protocol, host and port, so CORS is never involved. It is here to make the point that cross-origin means "a different origin", not "somewhere out on the internet".
+
+**Scenario 2: a plain cross-origin GET that succeeds.** curl reveals what the browser sees:
+
+\`\`\`
+curl -i -H "Origin: https://blog.zhdstudy.cloud" https://yoji.zhdstudy.cyou/healthz
+
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Access-Control-Allow-Origin: https://blog.zhdstudy.cloud
+Vary: Origin
+
+{"status":"ok","uptime":376765,"time":"2026-11-20T09:34:37.862Z"}
+\`\`\`
+
+- \`Access-Control-Allow-Origin\` is the only pass that matters: the server declares "this origin may read my response".
+- The value is not \`*\` but the \`Origin\` from my request header echoed back, together with \`Vary: Origin\`. That \`Vary\` is not optional — without it a CDN or browser cache may serve an A-origin response to a B-origin page.
+- Easy to miss: Yoji's \`/api/health\` is actually a 404 (\`{"code":1007,"message":"接口不存在"}\`), yet that 404 **also carries CORS headers**, because the \`cors()\` middleware sits before the routes and error responses pass through it too. Put CORS after your routes instead and the front end sees "404" stacked on top of "blocked by CORS" — miserable to debug.
+
+**Scenario 3: one custom header adds a preflight.**
+
+\`\`\`
+curl -i -X OPTIONS https://yoji.zhdstudy.cyou/api/ \\
+  -H "Origin: https://blog.zhdstudy.cloud" \\
+  -H "Access-Control-Request-Method: GET" \\
+  -H "Access-Control-Request-Headers: x-requested-with"
+
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: https://blog.zhdstudy.cloud
+Access-Control-Allow-Methods: GET,HEAD,PUT,PATCH,POST,DELETE
+Access-Control-Allow-Headers: content-type,x-requested-with
+\`\`\`
+
+A "simple request" in the browser's eyes means: method GET / HEAD / POST, and only Accept, Accept-Language, Content-Language and Content-Type among custom-ish headers (with Content-Type limited to \`application/x-www-form-urlencoded\`, \`multipart/form-data\` or \`text/plain\`). Anything beyond that triggers an OPTIONS preflight first:
+
+- Method PUT / PATCH / DELETE → preflight.
+- A custom header such as \`Authorization\` or \`X-Requested-With\` → preflight.
+- POST with \`application/json\` → preflight. This is the "mysterious extra request" every separated front/back-end project meets.
+- If the preflight fails, the real request is never sent: the Network panel shows a single OPTIONS entry marked CORS error.
+- Preflight results are cacheable — respond with \`Access-Control-Max-Age: 86400\` and the browser skips preflighting for a day.
+
+**Scenario 4: fetching the index HTML gets blocked.** Same domain, yet \`/healthz\` and \`/api/\` are readable while \`/\` is not. That is because \`/\` is served straight from nginx as static Next.js HTML and never passes through Node's \`cors()\`, so the response carries no \`Access-Control-Allow-Origin\` at all.
+
+Takeaway: **CORS applies per response, not per domain.** Allowing \`/api/\` while blocking \`/\` on the same machine is perfectly normal.
+
+**Scenario 5: add cookies and it is blocked again.** Same \`/healthz\` that just succeeded, only now fetch runs with \`credentials: 'include'\`. Yoji's \`cors()\` does not enable credentials, so \`Access-Control-Allow-Credentials: true\` is missing and the browser refuses. Credentialed requests follow stricter rules:
+
+- \`Access-Control-Allow-Origin\` cannot be \`*\`; it must be the exact origin.
+- \`Access-Control-Allow-Credentials: true\` must be present.
+- The front end must opt in explicitly with \`credentials: 'include'\` (\`withCredentials: true\` in axios).
+- All three are mandatory, and the cross-site cookie itself still needs \`SameSite=None; Secure\`.
+
+## Why this blog needs no CORS configuration at all
+
+The production nginx for this blog contains just this block:
+
+\`\`\`
+location /api/ {
+    proxy_pass http://127.0.0.1:4000/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+\`\`\`
+
+- The client is built with \`VITE_API_BASE_URL=/api\`, so the browser requests \`https://blog.zhdstudy.cloud/api/posts\` — same origin as the page, and CORS never enters the picture.
+- This is the most comfortable production setup: turn "cross-origin" into "same-origin plus server-side forwarding", and you also drop the preflight, hide the backend port, and apply HTTPS and rate limiting in one place.
+- The development-time equivalent is Vite's \`server.proxy\`, forwarding \`/api\` to \`http://localhost:4000\` so the browser again only ever sees same-origin requests.
+
+## Three ways to allow cross-origin access
+
+### 1. Application layer (recommended)
+
+Real code from the Yoji backend, \`server/src/app.js\`:
+
+\`\`\`
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+app.use(cors({ origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(',') }));
+\`\`\`
+
+with \`corsOrigin: process.env.CORS_ORIGIN || '*'\` in the config.
+
+- \`origin: true\` means "reflect the request Origin back", not "send \`*\`" — which is exactly why curl shows \`Access-Control-Allow-Origin: https://blog.zhdstudy.cloud\`.
+- Reflecting any Origin is largely harmless **without credentials** (it is a public API then). The moment cookies are involved you must switch to an allow-list, otherwise any website can call your API with a user's credentials.
+- This blog's backend uses the allow-list form:
+
+\`\`\`
+const corsOptions =
+  config.clientOrigin === '*'
+    ? { origin: true, credentials: true }
+    : { origin: config.clientOrigin, credentials: true };
+
+app.use(cors(corsOptions));
+\`\`\`
+
+In production \`CLIENT_ORIGIN=https://blog.zhdstudy.cloud\`, so only this site may make credentialed cross-origin calls.
+
+### 2. nginx layer
+
+Useful when the application is hard to change, or static assets must be exposed too:
+
+\`\`\`
+location /api/ {
+    if ($request_method = OPTIONS) {
+        add_header Access-Control-Allow-Origin $http_origin always;
+        add_header Access-Control-Allow-Methods 'GET,POST,PUT,PATCH,DELETE,OPTIONS' always;
+        add_header Access-Control-Allow-Headers 'Content-Type,Authorization' always;
+        add_header Access-Control-Max-Age 86400 always;
+        return 204;
+    }
+    add_header Access-Control-Allow-Origin $http_origin always;
+    proxy_pass http://127.0.0.1:3000;
+}
+\`\`\`
+
+Two traps I hit myself:
+
+- \`add_header\` needs \`always\`, otherwise 4xx / 5xx responses ship without CORS headers and the front end sees "API error" stacked on "blocked by CORS".
+- nginx \`add_header\` inheritance: as soon as a location declares any \`add_header\`, every \`add_header\` from the server / http level stops applying. HSTS and friends silently disappear and must be repeated inside the new location.
+- The snippet above reflects any Origin and is only suitable for public read-only endpoints. To tighten it, build an allow-list with \`map $http_origin $cors_origin { ... }\` and use \`$cors_origin\` instead.
+
+### 3. Reverse proxy to make it same-origin
+
+See the previous section — that is what this blog does, and it is my default recommendation.
+
+## Debugging checklist
+
+- Inspect the Response Headers of that request in the Network panel for \`Access-Control-Allow-Origin\` and check it is **exactly** the page's origin: protocol, subdomain and port must match, no trailing slash, and http is not https.
+- If there is an OPTIONS request, look at it first: a failed preflight means the real request never went out. Verify \`Access-Control-Allow-Headers\` covers every custom header you actually send.
+- 4xx / 5xx responses need CORS headers too: \`always\` in nginx, \`cors()\` before routes and error handlers in Express.
+- With cookies, remember the trio "exact Origin + Allow-Credentials + client-side include", plus \`SameSite=None; Secure\` on the cookie.
+- Headers like \`Access-Control-Allow-Origin\` are invisible to JS by default (the safelist is Cache-Control, Content-Language, Content-Length, Content-Type, Expires, Last-Modified, Pragma). If the client must read one, the server has to add \`Access-Control-Expose-Headers\`.
+- Request present in the server logs but the browser reports CORS — normal. The request arrived; the response was not released. Do not restart the service.
+- After changing server config, retest in an **incognito window**: browsers cache preflight results, and they cache failures too.
+
+## Summary
+
+- Cross-origin does not mean "the request failed"; it means "the response is not released to JS".
+- CORS applies per response, so \`/api/\` allowed and \`/\` blocked can coexist on one domain.
+- The sturdiest production answer is often to avoid cross-origin entirely: reverse-proxy the API onto a same-origin path.
+- When you must go cross-origin, configure an allow-list in the application; if nginx has to do it, mind \`always\` and the \`add_header\` inheritance rule.
+- Credentialed requests are the strictest: exact Origin, Allow-Credentials and client-side include are all mandatory.`
+    },
+    summary: {
+      zh: '用博客 blog.zhdstudy.cloud 真实请求 yoji.zhdstudy.cyou，5 个可点击的跨域场景演示同源策略、预检、带凭证与静态资源的差别，并给出应用层、nginx、反向代理三种放行方案与排查清单。',
+      en: 'Five clickable scenarios firing real requests from blog.zhdstudy.cloud to yoji.zhdstudy.cyou — same-origin policy, preflight, credentials and static files — plus three ways to allow CORS (app layer, nginx, reverse proxy) and a debugging checklist.'
+    },
+    category: {
+      zh: '后端',
+      en: 'Backend'
+    },
+    tags: ['cors', 'http', 'nginx', 'express', 'browser', 'security'],
+    coverImage: '',
+    isPublished: true,
+    createdAt: new Date('2026-11-20T10:00:00.000Z'),
+    updatedAt: new Date('2026-11-20T10:00:00.000Z')
+  },
+  {
     _id: '685a00000000000000000002',
     title: {
       zh: '自习室预约系统：用区间重叠校验解决抢座超卖',
